@@ -4,7 +4,8 @@
 #
 # autodetect.py - Reader detection module
 #
-# Reader detection (allowing for future expansion to support other models)
+# Reader detection (allows for future expansion to support other models)
+#
 
 """Auto Detect Reader Model
 
@@ -12,6 +13,7 @@ Attempt to detect the reader and select the correct class from the (not so exten
 
 """
 
+import exceptions
 from smartcard.System import readers
 
 COMPATIBLE_READER_NOT_DETECTED = "Reader could not be detected"
@@ -31,10 +33,9 @@ if reader_exists("ACS ACR122"):
 # elif usb_device_exists("MY READER"):
 #     import my_reader as reader
 else:
-    raise Exception(COMPATIBLE_READER_NOT_DETECTED)
+    raise exceptions.ReaderNotFoundException
 
 
 class Reader(reader.Reader):
-    """NFC Reader class."""
+    """NFC Reader class"""
     pass
-

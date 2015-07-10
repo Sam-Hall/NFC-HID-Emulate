@@ -10,17 +10,11 @@ All ACR122 specific code goes here.
 
 """
 
+import exceptions
 from smartcard.System import readers
 from smartcard.Exceptions import CardConnectionException, NoCardException
 
 READER_PREFIX = "ACS ACR122"
-
-# TODO : Define these as actual exception classes in the "reader" package...
-READER_NOT_FOUND = "Reader not found"
-CARD_NOT_FOUND = "Card not found"
-SERIAL_NUMBER_FAILED = "Failed to fetch serial number"
-SERIAL_NUMBER_NOT_SUPPORTED = "Serial number fetch unsupported"
-SERIAL_NUMBER_UNEXPECTED = "Unexpected error while fetching serial number"
 
 PICC_CMD_GET_DATA = [0xFF, 0xCA, 0x00, 0x00, 0x00]
 
@@ -30,11 +24,13 @@ def find_myself():
     for r in readers():
         if READER_PREFIX in str(r) and str(r).index(READER_PREFIX) == 0:
             return r
-    raise Exception(READER_NOT_FOUND)
+    raise exceptions.ReaderNotFoundException
 
 
 class Reader:
-    """ACR122 reader class. Built for ACR122U but may support similar USB models."""
+    """ACR122 reader class
+
+    Built for ACR122U but may support similar USB models"""
     # TODO: Find out what happens if reader disconnects during program execution and how to recover from that
 
     def __init__(self):
@@ -57,9 +53,9 @@ class Reader:
             if response_code == "9000":
                 return ''.join('{:02x}'.format(x) for x in data).upper()
             elif response_code == "6300":
-                raise Exception(SERIAL_NUMBER_FAILED)
+                raise exceptions.CSNFailedException
             elif response_code == "6A81":
-                raise Exception(SERIAL_NUMBER_NOT_SUPPORTED)
-            raise Exception(SERIAL_NUMBER_UNEXPECTED)
+                raise exceptions.CSNNotSupportedException
+            raise exceptions.CSNUnexpectedException
         except (CardConnectionException, NoCardException):
             return None

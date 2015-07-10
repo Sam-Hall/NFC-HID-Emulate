@@ -4,24 +4,23 @@
 #
 # main.py - USB HID reader emulation app
 #
-#
 
 import hidemu.reader.autodetect
+import hidemu.output.keystroker
 
 
 def main():
     """Launch app"""
-    # TODO: Create a cross platform output package
-
     # TODO: Add a systray GUI component and reader polling loop (or work out how to listen for a new card)
 
     # TODO: Ensure only one instance is running at a time.
 
     reader = hidemu.reader.autodetect.Reader()
+    key_stroker = hidemu.output.keystroker.KeyStroker()
     sn = reader.get_serial_number()
+    if sn:
+        key_stroker.send_string('# %4MF^' + sn + ';\n')
     print(sn)
-
 
 if __name__ == '__main__':
     main()
-
