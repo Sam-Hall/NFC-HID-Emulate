@@ -10,7 +10,7 @@ All ACR122 specific code goes here.
 
 """
 
-from smartcard.System import readers, readergroups
+from smartcard.System import readers
 from smartcard.Exceptions import CardConnectionException, NoCardException
 
 READER_PREFIX = "ACS ACR122"
