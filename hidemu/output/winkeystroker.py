@@ -32,8 +32,8 @@ class KeyStroker:
         for character in string:
             self.send_character(character)
 
-    def send_character(self, character, sync=1):
-        """Emulate typing a character (sync ignored on this platform)"""
+    def send_character(self, character):
+        """Emulate typing a character"""
         vk_code, modifiers = self._vk_and_modifiers_from_char(character[0])
         self._apply_modifiers(modifiers)
         self._key_down(vk_code)
@@ -42,7 +42,7 @@ class KeyStroker:
 
     def _apply_modifiers(self, modifiers):
         for bit in self._modifier_bit_split(modifiers):
-          self._key_down(MODIFIER_KEYCODE[bit])
+            self._key_down(MODIFIER_KEYCODE[bit])
 
     def _release_modifiers(self, modifiers):
         for bit in self._modifier_bit_split(modifiers):

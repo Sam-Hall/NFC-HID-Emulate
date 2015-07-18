@@ -14,6 +14,7 @@ Attempt to detect the reader and select the correct class from the (not so exten
 """
 
 import exceptions
+
 from smartcard.System import readers
 
 COMPATIBLE_READER_NOT_DETECTED = "Reader could not be detected"

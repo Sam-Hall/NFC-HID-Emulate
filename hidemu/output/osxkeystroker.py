@@ -2,15 +2,16 @@
 # Copyright (c) 2015 Sam Hall, Charles Darwin University
 # See LICENSE.txt for details.
 #
-# osxkeystroker.py - based on Plover modules
+# osxkeystroker.py - built on Plover module osxkeyboardcontrol
 
 """KeyStroker class for OSX
 
-Essentially a simplified module based on plover/oslayer/osxkeyboardcontrol for the sole purpose of emulating keystrokes.
+Wrapper on plover/oslayer/osxkeyboardcontrol with functionality cut down for the sole purpose of emulating keystrokes.
+Until I manage to get the project to build on OSX, this is about the best I can do for the platform.
 
 """
 
-import osxkeyboardcontrol  # Plover code
+import osxkeyboardcontrol  # Plover module
 
 
 class KeyStroker:
@@ -24,7 +25,7 @@ class KeyStroker:
         """Emulate typing a string"""
         self.plover_kb_emu.send_string(string)
 
-    def send_key(self, character, sync=1):
-        """Emulate typing a character (optionally syncing the display)"""
-        # TODO: in this case, this seems a bit silly, do I really need send_key?
+    def send_character(self, character):
+        """Emulate typing a character"""
+        # TODO: in this case, this seems a bit silly, do I really need send_character?
         self.send_string(character)
