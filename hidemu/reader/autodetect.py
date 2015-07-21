@@ -17,8 +17,6 @@ import exceptions
 
 from smartcard.System import readers
 
-COMPATIBLE_READER_NOT_DETECTED = "Reader could not be detected"
-
 
 def reader_exists(reader_prefix):
     for r in readers():

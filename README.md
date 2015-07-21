@@ -4,6 +4,7 @@ Human Interface Device emulator for ACR122 NFC readers. The niche purpose being 
 Testing performed only on the ACR122U model, but other USB models should work with some minor modifications to the reader package.
 
 ## Platforms
+Developed with Python versions 2.7.6 and 2.7.10
 
 ### Windows
 Tested on Win7 64bit
@@ -19,6 +20,7 @@ Tested on Ubuntu 14.04 and 14.10
 
 Requires (OS Packages):
 
+* ACS Unified Linux drivers
 * pcscd
 * swig
 * libpcsclite-dev
@@ -33,5 +35,6 @@ Unable to build as yet, problems with both the output and reader packages. Shoul
 Requires:
 
 * pyobjc
-* pyscard (requires swig to build)
+* swig
+* pyscard
 

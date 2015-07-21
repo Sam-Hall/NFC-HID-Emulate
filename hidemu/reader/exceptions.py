@@ -18,19 +18,19 @@ class CardNotFoundException(Exception):
         Exception.__init__(self, "Card not found", *args)
 
 
-class CSNFailedException(Exception):
+class FailedException(Exception):
     """Failed to fetch serial number"""
     def __init__(self, *args):
-        Exception.__init__(self, "Failed to fetch serial number", *args)
+        Exception.__init__(self, "No information given", *args)
 
 
-class CSNNotSupportedException(Exception):
-    """Serial number fetch unsupported (check card type)"""
+class NotSupportedException(Exception):
+    """Function not supported (check card type)"""
     def __init__(self, *args):
-        Exception.__init__(self, "Serial number fetch unsupported", *args)
+        Exception.__init__(self, "Function not supported", *args)
 
 
-class CSNUnexpectedException(Exception):
-    """Unexpected error while fetching serial number"""
+class UnexpectedErrorCodeException(Exception):
+    """Unexpected error code"""
     def __init__(self, *args):
-        Exception.__init__(self, "Unexpected error while fetching serial number", *args)
+        Exception.__init__(self, "Unexpected error", *args)
