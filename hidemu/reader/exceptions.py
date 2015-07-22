@@ -18,6 +18,12 @@ class CardNotFoundException(Exception):
         Exception.__init__(self, "Card not found", *args)
 
 
+class ConnectionLostException(Exception):
+    """Card connection no longer valid"""
+    def __init__(self, *args):
+        Exception.__init__(self, "Card connection lost", *args)
+
+
 class FailedException(Exception):
     """Failed to fetch serial number"""
     def __init__(self, *args):

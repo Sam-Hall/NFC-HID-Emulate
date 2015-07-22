@@ -29,8 +29,6 @@ PICC_CMD_READ_BLOCK = ["Read Block",  [0xFF, 0xB0, 0x00]]  # + [block num, lengt
 # Example Pseudo-APDU read command (may need similar such commands for Mifare Plus)
 PICC_CMD_READ_BLOCK0_DIRECT = ["Read Block Direct", [0xFF, 0x00, 0x00, 0x00, 0x05, 0xD4, 0x40, 0x01, 0x30, 0x00]]
 
-DEBUG = False
-
 
 class Reader:
     """ACR122 reader class
@@ -43,20 +41,21 @@ class Reader:
         # Current card...
         self.card_ATR = None
         self.card_authentication = None
-        pass
 
     def connect(self, timeout=1, new_card_only=True):
         """Returns a connection if possible, otherwise returns None"""
         card_request = CardRequest(readers=[self.reader], timeout=timeout, newcardonly=new_card_only)
         card_service = card_request.waitforcard()
+        # TODO: Why did next line throw the following error when switching between card formats? ...
+        # CardConnectionException: Unable to connect with protocol: T0 or T1.
+        # The specified reader is not currently available for use.
         card_service.connection.connect()
-        self.card_authentication = None
-        self.card_ATR = card_service.connection.getATR()
-        if DEBUG: print 'ATR: ' + toHexString(self.card_ATR)
-        card_service.connection.disconnect()
-
-        # Establish reader-centric connection
         try:
+            self.card_authentication = None
+            self.card_ATR = card_service.connection.getATR()
+            card_service.connection.disconnect()
+
+            # Establish reader-centric connection
             connection = self.reader.createConnection()
             connection.connect()
             self.load_keys(connection)  # Reset reader keys to default
@@ -85,7 +84,6 @@ class Reader:
 
         Reader._transmit(connection, PICC_CMD_LOAD_KEY_0, key_0)
         Reader._transmit(connection, PICC_CMD_LOAD_KEY_1, key_1)
-        if DEBUG: print("Keys loaded into ACR122 reader")
 
     @staticmethod
     def get_serial_number(connection):
@@ -107,7 +105,11 @@ class Reader:
         command_desc = command[0]
         full_command = command[1]+command_vars
         sw = [0, 0]
-        data, sw[0], sw[1] = connection.transmit(full_command)
+        try:
+            data, sw[0], sw[1] = connection.transmit(full_command)
+        except(AttributeError, IndexError):
+            # Connection lost
+            raise exceptions.ConnectionLostException
         response_code = toHexString(sw)
         if response_code == "63 00":
             raise exceptions.FailedException(command_desc)
@@ -124,7 +126,6 @@ class Reader:
 
         data = Reader._transmit(connection, PICC_CMD_READ_BLOCK, [block, length])
         # data = Reader._transmit(connection, PICC_CMD_READ_BLOCK0_DIRECT)
-        if DEBUG: print('Block ' + str(block).zfill(2) + ': ' + toHexString(data))
         return data
 
     @staticmethod
@@ -138,4 +139,3 @@ class Reader:
             Reader._transmit(connection, PICC_CMD_MFC_AUTH, [sector * 4, 0x60, key_a])
         if key_b is not None:
             Reader._transmit(connection, PICC_CMD_MFC_AUTH, [sector * 4, 0x61, key_b])
-        if DEBUG: print("Sector " + str(sector) + " auth ok, ready to read...")

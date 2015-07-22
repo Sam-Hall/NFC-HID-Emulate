@@ -6,9 +6,28 @@
 #
 
 import os
-from hidemu.reader import autodetect
-from hidemu.output import keystroker
-from smartcard.Exceptions import CardRequestTimeoutException
+import logging
+import traceback
+
+
+# Logging Config
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+handler = logging.FileHandler('hidemu.log')
+handler.setLevel(logging.WARN)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s: %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+
+try:
+    from hidemu.reader import autodetect
+    from hidemu.output import keystroker
+    from smartcard.util import toHexString, toBytes
+    from smartcard.Exceptions import CardRequestTimeoutException
+except BaseException:
+    logger.critical(traceback.format_exc())
+    raise
 
 
 def main():
@@ -18,33 +37,41 @@ def main():
     # TODO: Output format configurable from a ini file.
     # Support: card type, UID (hex or decimal), given value from binary read with length and offset
 
-    reader = autodetect.Reader()
-    key_stroker = keystroker.KeyStroker()
+    logger.info('SERVICE STARTING')
 
     try:
-        conn = reader.connect(1, False)
-    except CardRequestTimeoutException:
-        conn = None
 
-    while 1:
-        while conn is None:
+        reader = autodetect.Reader()
+        key_stroker = keystroker.KeyStroker()
+
+        try:
+            conn = reader.connect(1, False)
+        except CardRequestTimeoutException:
+            conn = None
+
+        while 1:
             try:
-                conn = reader.connect()
-
-                sn = reader.get_serial_number(conn)
-
-                if sn:
-                    sn_str = ''.join('{:02x}'.format(x) for x in sn).upper()
-                    key_stroker.send_string('#' + str(len(sn)) + 'MF^' + sn_str + ';' + os.linesep)
-                    print('UID: ' + sn_str)
-                    # mfc1k_read_test(reader, conn)
-                else:
-                    print('No UID read!')
+                if conn is None: conn = reader.connect()
+                if conn is not None:
+                    logger.info('Card detected: ' + toHexString(reader.card_ATR))
+                    sn = reader.get_serial_number(conn)
+                    if sn:
+                        logger.info('Card UID: ' + toHexString(sn))
+                        sn_str = ''.join('{:02x}'.format(x) for x in sn).upper()
+                        key_stroker.send_string('#' + str(len(sn)) + 'MF^' + sn_str + ';' + os.linesep)
+                        # mfc1k_read_test(reader, conn)
+                    else:
+                        logger.warn('No UID read!')
+                    conn.disconnect()
             except CardRequestTimeoutException:
-                conn = None
+                pass
+            conn = None
 
-        conn.disconnect()
-        conn = None
+    except KeyboardInterrupt:
+        logger.info('SERVICE TERMINATED')
+    except BaseException:
+        logger.critical(traceback.format_exc())
+        raise
 
 
 def mfc1k_read_test(reader, connection):
@@ -56,11 +83,10 @@ def mfc1k_read_test(reader, connection):
         for b in range(block, block + 4):
             try:
                 data = reader.read_block(connection, b, 0x10, 0x00)
-                print('Block ' + str(b).zfill(2) + ': ' + ''.join('{:02x}'.format(x) for x in data).upper())
+                logger.debug('Block ' + str(b).zfill(2) + ': ' + ''.join('{:02x}'.format(x) for x in data).upper())
             except Exception as e:
-                print('Failed block read (' + str(b).zfill(2) + '): ' + type(e).__name__ + str(e))
+                logger.debug('Failed block read (' + str(b).zfill(2) + '): ' + type(e).__name__ + str(e))
 
 
 if __name__ == '__main__':
     main()
-

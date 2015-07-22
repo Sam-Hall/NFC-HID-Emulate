@@ -59,8 +59,9 @@ SPECIAL_KEYSYM = {
 class KeyStroker:
     """Emulate key strokes"""
 
-    def __init__(self):
+    def __init__(self, logger=None):
         """Refer some useful Xlib objects"""
+        self.logger = logger
         self.display = display.Display()
         self.shift_keycode = self.display.keysym_to_keycode(XK.XK_Shift_L)
 

@@ -13,28 +13,31 @@ Maintain same architecture as OS (reader drivers and python stuff)
 
 Requires:
 
-* pyscard
+* pyscard 1.7
+* No drivers required
 
 ### Linux
 Tested on Ubuntu 14.04 and 14.10
 
-Requires (OS Packages):
+Requires:
 
 * ACS Unified Linux drivers
 * pcscd
-* swig
 * libpcsclite-dev
 * python-xlib
+* swig (to build pyscard from source)
 * pyscard (build latest from source)
 
 ### OSX - Unsupported
 Unsuccessfully tested on OSX 10.10
 
-Unable to build as yet, problems with both the output and reader packages. Should work in theory.
+Reader working, output package still out of order (just crashes Python). One clue from the internet is that perhaps Python 2.6 would work better for the pyobjc Quartz requirement.
+
+Another hurdle I'm still yet to hit is that OSX 10.10 requires a security exception to enable the accessibility features required to emulate keystrokes. How to go about that during development I have no idea. I don't intend to pursue OSX support any further, but if anyone gets it working feel free to share your secrets in the issues register.
 
 Requires:
 
+* ACS Unified Installer OSX drivers
 * pyobjc
-* swig
-* pyscard
-
+* swig (to build pyscard from source)
+* pyscard (build latest from source)
