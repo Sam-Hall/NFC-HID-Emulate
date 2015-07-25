@@ -11,6 +11,7 @@ All ACR122 specific code goes here.
 """
 
 import exceptions
+from base import ReaderBase
 from smartcard.System import readers
 from smartcard.CardRequest import CardRequest
 from smartcard.Exceptions import CardConnectionException, NoCardException
@@ -30,50 +31,47 @@ PICC_CMD_READ_BLOCK = ["Read Block",  [0xFF, 0xB0, 0x00]]  # + [block num, lengt
 PICC_CMD_READ_BLOCK0_DIRECT = ["Read Block Direct", [0xFF, 0x00, 0x00, 0x00, 0x05, 0xD4, 0x40, 0x01, 0x30, 0x00]]
 
 
-class Reader:
+class Reader(ReaderBase):
     """ACR122 reader class
 
     Built for ACR122U but may support similar USB models. This class will only ever support basic reading operations.
     Assumes reader will remain connected for the duration of program execution."""
 
     def __init__(self):
+        ReaderBase.__init__(self)
         self.reader = Reader._find_myself()
-        # Current card...
-        self.card_ATR = None
-        self.card_authentication = None
 
     def connect(self, timeout=1, new_card_only=True):
         """Returns a connection if possible, otherwise returns None"""
         card_request = CardRequest(readers=[self.reader], timeout=timeout, newcardonly=new_card_only)
         card_service = card_request.waitforcard()
-        # TODO: Why did next line throw the following error when switching between card formats? ...
-        # CardConnectionException: Unable to connect with protocol: T0 or T1.
-        # The specified reader is not currently available for use.
         card_service.connection.connect()
         try:
             self.card_authentication = None
-            self.card_ATR = card_service.connection.getATR()
+            self.process_atr(card_service.connection.getATR())
             card_service.connection.disconnect()
 
             # Establish reader-centric connection
             connection = self.reader.createConnection()
             connection.connect()
-            self.load_keys(connection)  # Reset reader keys to default
             return connection
         except (CardConnectionException, NoCardException):
             return None
 
     def read_block(self, connection, block, length, key_a_num=None, key_b_num=None):
         """Either key A or B must be specified for Mifare Classic cards"""
-        valid_num = [0x00, 0x01, None]
-        assert key_a_num in valid_num and key_b_num in valid_num
-        if [key_a_num, key_b_num] != [None, None]:
+        if not self.card_readable: raise exceptions.NotSupportedException("Read From Card")
+        if self.card_authable:
+            valid_num = [0x00, 0x01]
+            assert key_a_num in valid_num or key_b_num in valid_num
             sector = block >> 2
+            if sector >= 32: sector = ((sector-32) >> 2) + 32  # 4K MFC cards have 8 sectors of 16 blocks at the end
             if self.card_authentication != [sector, key_a_num, key_b_num]:
                 Reader._auth_mfc(connection, sector, key_a_num, key_b_num)
                 self.card_authentication = [sector, key_a_num, key_b_num]
         return Reader._read_block(connection, block, length)
 
+    # TODO: Find a way to load keys without the need for the card to be present
     @staticmethod
     def load_keys(connection, key_0=None, key_1=None):
         """Load keys into the reader. Omitting a key will revert it to the default FF key"""
