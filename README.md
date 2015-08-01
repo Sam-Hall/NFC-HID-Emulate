@@ -3,6 +3,10 @@ Human Interface Device emulator for ACR122 NFC readers. The niche purpose being 
 
 Testing performed only on the ACR122U model, but other USB models should work with some minor modifications to the reader package.
 
+Designed to run as a service in the background (or more accurately, a user daemon - since it requires the current user desktop session to function). The ideal time to start the program is on login. To avoid conflicts, the application will only attempt to load once. You may have problems getting it to work after switching users unless the first user logs out completely.
+
+There are some command line args, you can bring up all currently available options with the "-h" switch.
+
 ## Platforms
 Developed with Python versions 2.7.6 and 2.7.10
 
@@ -29,11 +33,11 @@ Requires:
 * pyscard (build latest from source)
 
 ### OSX - Unsupported
-Unsuccessfully tested on OSX 10.10
+Currently no intention to develop the keyboard emulation features required to make the output package work on OSX. Brief attempts to integrate osxkeyboardcontrol.py from Plover project proved fruitless on OSX 10.10.
 
-Reader working, output package still out of order (just crashes Python). One clue from the internet is that perhaps Python 2.6 would work better for the pyobjc Quartz requirement.
+Since I have no need for OSX support, this option has been shelved. If you need OSX support, it should be possible to emulate key strokes via the "pyobjc-framework-quartz" package and some security/accessibility settings which need to be applied through System Preferences.
 
-Another hurdle I'm still yet to hit is that OSX 10.10 requires a security exception to enable the accessibility features required to emulate keystrokes. How to go about that during development I have no idea. I don't intend to pursue OSX support any further, but if anyone gets it working feel free to share your secrets in the issues register.
+Any OSX specific output modules have been removed (the modules were borrowed pretty much verbatim from Plover project anyway).
 
 Requires:
 

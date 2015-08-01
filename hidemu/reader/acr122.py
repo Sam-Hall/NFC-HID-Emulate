@@ -10,8 +10,9 @@ All ACR122 specific code goes here.
 
 """
 
-import exceptions
 import time
+import logging
+import exceptions
 from base import ReaderBase
 from smartcard.System import readers
 from smartcard.CardRequest import CardRequest
@@ -37,7 +38,7 @@ class Reader(ReaderBase):
     """ACR122 reader class
 
     Built for ACR122U but may support similar USB models. This class will only ever support basic reading operations.
-    Assumes reader will remain connected for the duration of program execution."""
+    """
 
     def __init__(self):
         ReaderBase.__init__(self)
@@ -82,8 +83,9 @@ class Reader(ReaderBase):
             connection.connect()
             Reader._output_control(connection, 0x50, 0x05, 0x05, duration, 0x00)
             time.sleep(duration)
-        except:
-            # TODO: Log this
+        except Exception as e:
+            logger = logging.getLogger('hidemu')
+            logger.error('Exception while attempting to send error signals to reader ' + type(e).__name__)
             pass
 
     @staticmethod
