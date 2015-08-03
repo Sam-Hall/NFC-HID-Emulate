@@ -9,7 +9,7 @@
 import os
 import sys
 import time
-import json
+import string
 import logging
 import traceback
 
@@ -18,15 +18,12 @@ logger = logging.getLogger('hidemu')  # Global logging.Logger instance (defined 
 try:  # Non-standard module imports that may fail
     import singleproc
     from output import keystroker
-    from smartcard.util import toHexString, toBytes
+    from smartcard.util import toHexString, toBytes, PACK, HEX, UPPERCASE, COMMA
     from smartcard.Exceptions import CardRequestTimeoutException, CardConnectionException
-    from reader.exceptions import ReaderNotFoundException
+    from reader.exceptions import ReaderNotFoundException, FailedException, ConnectionLostException
 except BaseException:
     logger.critical(traceback.format_exc())
     raise
-
-
-OUTPUT_SUBSTITUTIONS = ['UIDLEN', 'TYPE', 'SUBTYPE', 'UIDINT', 'UID', 'CR', 'DATA']
 
 
 class HIDEmu:
@@ -60,45 +57,71 @@ class HIDEmu:
         self.key2 = key2
         self.data_definition = data_definition
 
-    def _read_data(self, connection):
-        data_list = []
-        if self.data_definition is not None:
-            data_def = self.data_definition
-            if type(data_def) == dict:
-                data_def = [data_def]
-            for i in range(0, min(len(data_def), 8)):
-                data_spec = data_def[i]
-                data_auth = data_spec.get("auth1", None)
-                data_type = data_spec.get("type", None)
-                data_block = data_spec.get("block", None)
-                data_length = data_spec.get("length", None)
-                print "{0} {1} {2} {3}".format(data_auth, data_type, data_block, data_length)
-            return self._read_data_bytes(connection, data_block, data_length)
+    @staticmethod
+    def bytes_to_type(byte_list, data_type="hex"):
+        if data_type == "ascii":
+            ascii = ''.join(chr(i) for i in byte_list)
+            ascii = filter(lambda x: x in string.printable, ascii)
+            return ascii
+        elif data_type == "int":
+            return HIDEmu._little_endian_value(byte_list)
+        else:
+            return toHexString(byte_list, PACK)
 
+    def _read_defined_data(self, connection):
+        """Return a string list of 8 elements based on data_definition."""
+        data_list = ["", "", "", "", "", "", "", ""]
+        if self.data_definition is not None and self.reader.card_readable:
+            data_def_list = self.data_definition
+            if type(data_def_list) == dict:
+                data_def_list = [data_def_list]
+            for i in range(0, min(len(data_def_list), 8)):
+                data_spec = data_def_list[i]
+                data_key_a = data_spec.get("keyA", None)
+                data_key_b = data_spec.get("keyB", None)
+                data_type = data_spec.get("type", "hex")
+                data_block = data_spec.get("block", 0)
+                data_offset = data_spec.get("offset", 0)
+                data_length = data_spec.get("length", 1)
+
+                try:  # Read data based on the data definition
+                    # Read data_block with length=data_length+data_offset and then trim everything before the offset
+                    block_read = self._read_block(connection, data_block, data_length + data_offset,
+                                                  data_key_a, data_key_b)[data_offset:]
+                    # Process bytes based on type
+                    data = HIDEmu.bytes_to_type(block_read, data_type)
+                    data_list[i] = data
+                except FailedException:
+                    self.logger.warn("Data definition failed to apply to current card: " + str(data_spec))
+                    raise
+                except ConnectionLostException:
+                    self.logger.warn("Connection lost while processing data definition.")
+                    raise
         return data_list
 
     def _process_card(self, connection):
         """This is where the magic happens"""
         self.reader.busy_signal(connection)
-        self.logger.debug(self.reader.card_description + ' card detected: ' + toHexString(self.reader.card_ATR))
-        sn = self.reader.get_serial_number(connection)
-        if sn:
-            self.logger.debug('Card UID: ' + toHexString(sn))
-            # self._read_card_test(connection)
-            # TODO: parse data definition json and read data accordinly
-            data = self._read_data_bytes(connection, 0x03, 0x04)
-
-            output_string = self.head + self.start1 + self.track1 + self.end
-            if self.track2 != "":
-                output_string = self.start2 + self.track2 + self.end
-            if self.track3 != "":
-                output_string = self.start3 + self.track3 + self.end
-            output_string += self.tail
-
-            self.key_stroker.send_string(
-                self._process_output_string(output_string, sn))
+        self.logger.info(self.reader.card_description + ' card detected')
+        self.logger.debug('ATR: ' + toHexString(self.reader.card_ATR))
+        card_serial_number = self.reader.get_serial_number(connection)
+        if card_serial_number:
+            self.logger.debug('UID: ' + toHexString(card_serial_number))
         else:
+            card_serial_number = []
             self.logger.warn('No UID read!')
+
+        # parse data definition and read data accordingly
+        data_list = self._read_defined_data(connection)
+
+        output_string = self.head + self.start1 + self.track1 + self.end
+        if self.track2 != "": output_string += self.start2 + self.track2 + self.end
+        if self.track3 != "": output_string += self.start3 + self.track3 + self.end
+        output_string += self.tail
+
+        self.key_stroker.send_string(
+            self._process_output_string(output_string, card_serial_number, data_list))
+
         self.reader.ready_signal(connection)
         connection.disconnect()
 
@@ -118,26 +141,9 @@ class HIDEmu:
                     self.logger.warn("Reader appears busy, this may indicate another piece of software is using it.")
                     busy_error = True
 
-    def _read_data_bytes(self, connection, block, length, offset=0, key_a_num=None, key_b_num=None):
-        return [0x10, 0x00, 0x00, 0x00]  # TODO: finish this
-
-    def _read_card_test(self, connection):
-        if not self.reader.card_readable:
-            self.logger.info('Card read not supported')
-        else:
-
-            start_sector = 0
-            if self.reader.card_authable: self.reader.load_keys(connection, [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
-
-            for sector in range(start_sector, 16):
-                block = sector * 4
-                for b in range(block, block + 4):
-                    try:
-                        data = self.reader.read_block(connection, b, 0x10, 0x00)
-                        self.logger.debug(
-                            'Block ' + str(b).zfill(2) + ': ' + ''.join('{:02x}'.format(x) for x in data).upper())
-                    except Exception as e:
-                        self.logger.debug('Failed block read (' + str(b).zfill(2) + '): ' + type(e).__name__ + str(e))
+    def _read_block(self, connection, block, length, key_a_num=None, key_b_num=None):
+        ret_list = self.reader.read_block(connection, block, length, key_a_num, key_b_num)
+        return ret_list
 
     @staticmethod
     def _little_endian_value(byte_list):
@@ -153,8 +159,8 @@ class HIDEmu:
         int(value, 16)  # also throws ValueError if not a hex string
         return toBytes(value)
 
-    def _process_output_string(self, output_string, uid_bytes,
-                               data0="", data1="", data2="", data3="", data4="", data5="", data6="", data7=""):
+    def _process_output_string(self, output_string, uid_bytes, data_list=None):
+        if data_list is None: data_list = ["", "", "", "", "", "", "", ""]
         if uid_bytes is None:
             uidlen = "0"
             uidint = ""
@@ -162,15 +168,23 @@ class HIDEmu:
         else:
             uidlen = str(len(uid_bytes))
             uidint = str(self._little_endian_value(uid_bytes))
-            uid = toHexString(uid_bytes,1)
+            uid = toHexString(uid_bytes, PACK)
 
         return output_string.format(UIDLEN=uidlen,
                                     TYPE=self.reader.card_type,
                                     SUBTYPE=self.reader.card_subtype,
                                     UIDINT=uidint,
                                     UID=uid,
-                                    CR=os.linesep, DATA="",
-                                    DATA0="", DATA1="", DATA2="", DATA3="", DATA4="", DATA5="", DATA6="", DATA7="")
+                                    CR=os.linesep,
+                                    DATA=data_list[0],
+                                    DATA0=data_list[0],
+                                    DATA1=data_list[1],
+                                    DATA2=data_list[2],
+                                    DATA3=data_list[3],
+                                    DATA4=data_list[4],
+                                    DATA5=data_list[5],
+                                    DATA6=data_list[6],
+                                    DATA7=data_list[7])
 
     def set_status(self, status):
         self.status = status
@@ -186,6 +200,7 @@ class HIDEmu:
         try:
             self.running = True
             self.reader = self._wait_for_reader()
+            self.reader.set_keys(self.key1, self.key2)
             self.key_stroker = keystroker.KeyStroker()
             self.set_status('STARTED')
 
@@ -202,6 +217,12 @@ class HIDEmu:
                 except CardRequestTimeoutException:
                     # Connection not established within the specified time frame (normal behaviour)
                     pass
+                except FailedException, args:
+                    # An error occurred while reading card
+                    self.logger.warn("Card processing failed: " + str(args))
+                except ConnectionLostException, args:
+                    # Card likely removed too quickly
+                    self.logger.warn("Card removed too soon: " + str(args))
                 except CardConnectionException:
                     # Unexpected but recoverable error, possibly caused by a software conflict
                     self.logger.error(traceback.format_exc())

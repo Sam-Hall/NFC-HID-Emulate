@@ -15,7 +15,7 @@ from hidemu import HIDEmu
 
 # These values are also used setup.py
 __app_name__ = "ACR122 HID Emulator"
-__version__ = "0.2.01"  # TODO: Update this before build
+__version__ = "0.3.00"  # TODO: Update this before build
 
 
 def setup_logger(logger_name, log_filename):
@@ -25,7 +25,7 @@ def setup_logger(logger_name, log_filename):
     # Levels: NOTSET, DEBUG, INFO, WARNING, ERROR, CRITICAL
     logfile_level = logging.INFO
     console_level = logging.NOTSET
-    console_level = logging.DEBUG  # TODO: Comment this out before build
+    # console_level = logging.DEBUG  # TODO: Comment this out before build
 
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.DEBUG)
@@ -59,7 +59,7 @@ def setup_arg_parser():
                         version=__app_name__ + " " + __version__)
     parser.add_argument("-hd", "--head", type=substitution_string_arg,
                         help="String to output before pseduo-tracks (optional).",
-                        default="#")  # TODO: Change to empty string before build
+                        default="")  # TODO: Change to empty string before build
     parser.add_argument("-s1", "--start1", type=substitution_string_arg,
                         help="Pseudo-track 1 start sentinel. \n\nDEFAULT: %%",
                         default="%")
@@ -101,27 +101,28 @@ def setup_arg_parser():
     parser.add_argument("-tl", "--tail", type=substitution_string_arg,
                         help="String to output after pseduo-tracks (optional). \n\nDEFAULT: {CR}",
                         default="{CR}")
-    # parser.add_argument("-k1", "--key1", type=mifare_key_arg,
-    #                     help="Mifare Key 1 - six bytes. \n\nDEFAULT: FFFFFFFFFFFF",
-    #                     default="FFFFFFFFFFFF")
-    # parser.add_argument("-k2", "--key2", type=mifare_key_arg,
-    #                     help="Mifare Key 2 - six bytes. \n\nDEFAULT: FFFFFFFFFFFF",
-    #                     default="FFFFFFFFFFFF")
+    parser.add_argument("-k0", "--key0", type=mifare_key_arg,
+                        help="Mifare Key 1 - six bytes. \n\nDEFAULT: FFFFFFFFFFFF",
+                        default="FFFFFFFFFFFF")
+    parser.add_argument("-k1", "--key1", type=mifare_key_arg,
+                        help="Mifare Key 2 - six bytes. \n\nDEFAULT: FFFFFFFFFFFF",
+                        default="FFFFFFFFFFFF")
     # parser.add_argument("-kf", "--keyfile",
     #                     help="Mifare Key file - two lines (KEY1 and KEY2).\n"
     #                     "Takes priority over KEY1 and KEY2 when specified.")
-    # parser.add_argument("-dd", "--datadefinition", type=json.loads,
-    #                     help="Data definition - json string. Maximum of 8 elements. \n"
-    #                     "\n"
-    #                     "E.G. \n'[{\"auth\":\"<A<0|1>|B<0|1>>\",\"type\":\"<int|ascii|hex>\",\n"
-    #                     "\"mad\":\"HHHH\",\"block\":nn,\"offset\":nn,\"length\":nn}]'\n"
-    #                     "\n"
-    #                     "NOTES:\n  * \"auth\" may be optional depending on card type.\n"
-    #                     "  * \"mad\" optional. 2 byte MAD entry hex string.\n"
-    #                     "  * \"block\" absolute or offset (when \"mad\" present).\n"
-    #                     "  * \"offset\" is optional (default is 0).\n"
-    #                     "  * \"type\":\"int\" recommended for track 2 & 3 data for\n"
-    #                     "    magstripe application compatibilty reasons.")
+    parser.add_argument("-dd", "--data-definition", type=json.loads,
+                        help="Data definition - json string. Maximum of 8 elements. \n"
+                        "\n"
+                        "E.G. \n'[{\"key<A|B>\":\"<0|1>\",\"type\":\"<int|ascii|hex>\",\n"
+                        # "\"mad\":\"HHHH\","
+                        "\"block\":n,\"offset\":n,\"length\":n}]'\n"
+                        "\n"
+                        "NOTES:\n  * \"key<A|B>\" may be optional depending on card type.\n"
+                        # "  * \"mad\" optional. 2 byte MAD entry hex string.\n"
+                        "  * \"block\" absolute or offset (when \"mad\" present).\n"
+                        "  * \"offset\" is optional (default is 0).\n"
+                        "  * \"type\":\"int\" recommended for track 2 & 3 data for\n"
+                        "    magstripe application compatibilty reasons.")
     parser.add_argument("-l", "--log", type=log_file_arg,
                         help="\nLog file. \n\nDEFAULT: hidemu.log",
                         default="hidemu.log")
@@ -156,7 +157,8 @@ def log_file_arg(file_name):
 
 
 def substitution_string_arg(string):
-    try:  # Would love to find a more dynamic way to validate substitutions
+    try:
+        # Keeo this list in sync with the format list in HIDEmu._process_output_string
         string.format(UIDLEN="", TYPE="", SUBTYPE="", UIDINT="", UID="", CR="", DATA="",
                       DATA0="", DATA1="", DATA2="", DATA3="", DATA4="", DATA5="", DATA6="", DATA7="")
     except KeyError:
@@ -177,10 +179,13 @@ def main():
                      start2=args.start2,
                      start3=args.start3,
                      track1=args.track1,
-                     end=args.end)
+                     end=args.end,
+                     tail=args.tail,
+                     key1=args.key0,
+                     key2=args.key1,
+                     data_definition=args.data_definition)
     hid_emu.start_daemon()
 
 
 if __name__ == '__main__':
     main()
-

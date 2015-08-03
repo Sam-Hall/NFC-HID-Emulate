@@ -57,7 +57,7 @@ SPECIAL_KEYSYM = {
 
 
 class KeyStroker:
-    """Emulate key strokes"""
+    """Emulate key strokes required to output specified characters"""
 
     def __init__(self):
         self.display = display.Display()
@@ -66,7 +66,10 @@ class KeyStroker:
     def send_string(self, string):
         """Emulate typing a string"""
         for character in string:
-            self.send_character(character)
+            try:
+                self.send_character(character)
+            except KeyError:
+                pass  # Invalid character
 
     def send_character(self, character):
         """Emulate typing a character"""

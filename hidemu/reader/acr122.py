@@ -17,7 +17,7 @@ from base import ReaderBase
 from smartcard.System import readers
 from smartcard.CardRequest import CardRequest
 from smartcard.Exceptions import CardConnectionException, NoCardException
-from smartcard.util import toHexString
+from smartcard.util import toHexString, toBytes
 
 READER_PREFIX = "ACS ACR122"
 
@@ -43,6 +43,13 @@ class Reader(ReaderBase):
     def __init__(self):
         ReaderBase.__init__(self)
         self.reader = Reader._find_myself()
+        self.logger = logging.getLogger('hidemu')
+
+        # Flag to ensure keys are loaded upon next connection.
+        # These values are reset once keys are loaded.
+        self.key_load_pending = False
+        self.key_0_byte_list = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
+        self.key_1_byte_list = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
 
     def connect(self, timeout=1, new_card_only=True):
         """Returns a connection if possible, otherwise returns None"""
@@ -57,6 +64,10 @@ class Reader(ReaderBase):
             # Establish reader-centric connection
             connection = self.reader.createConnection()
             connection.connect()
+
+            # Load keys if need be
+            if self.key_load_pending: self._load_keys(connection)
+
             return connection
         except (CardConnectionException, NoCardException):
             return None
@@ -84,14 +95,13 @@ class Reader(ReaderBase):
             Reader._output_control(connection, 0x50, 0x05, 0x05, duration, 0x00)
             time.sleep(duration)
         except Exception as e:
-            logger = logging.getLogger('hidemu')
-            logger.error('Exception while attempting to send error signals to reader ' + type(e).__name__)
+            self.logger.error('Exception while attempting to send error signals to reader: ' + type(e).__name__)
             pass
 
     @staticmethod
     def busy_signal(connection):
         """Orange light"""
-        Reader._output_control(connection, 0x0F)  # 0x0F enables both red and green LED (orange)
+        Reader._output_control(connection, 0x0F)  # 0x0F enables both red and green LED (makes orange)
 
     @staticmethod
     def ready_signal(connection):
@@ -102,22 +112,41 @@ class Reader(ReaderBase):
     def _output_control(connection, led_state, t1_dur=0x00, t2_dur=0x00, repetitions=0x00, buzzer=0x00):
         try:
             Reader._transmit(connection, PICC_CMD_OUTPUT_CTL, [led_state, 0x04, t1_dur, t2_dur, repetitions, buzzer])
-        except exceptions.UnexpectedErrorCodeException:
-            # This guy returns Current LED State in sw2 which _transmit does not expect
-            pass
+        except exceptions.UnexpectedErrorCodeException, args:
+            # Current LED State returned via sw2 which _transmit does not expect
+            sw1 = args[3]
+            if sw1 == 0x90: pass
+            else: raise
 
-    @staticmethod
-    def load_keys(connection, key_0=None, key_1=None):
-        """Load keys into the reader
+    def set_keys(self, key_0=None, key_1=None):
+        """Specify reader keys 0 and 1 as 12 character hex strings (not to be confused with sector keys A and B)
+
+        These keys will be used to access blocks, at that time either key 1 or 2 can be used as key A and/or B.
 
         Omitting a key will revert it to the default FF key"""
-        if key_0 is None: key_0 = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
-        if key_1 is None: key_1 = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
-        assert len(key_0) == 6
-        assert len(key_1) == 6
-        # Note: seems impossible with pyscard to load keys until a card is sitting on the reader
-        Reader._transmit(connection, PICC_CMD_LOAD_KEY_0, key_0)
-        Reader._transmit(connection, PICC_CMD_LOAD_KEY_1, key_1)
+        if key_0 is None: key_0 = "FFFFFFFFFFFF"
+        if key_1 is None: key_1 = "FFFFFFFFFFFF"
+        assert len(key_0) == 12 and len(key_1) == 12
+        assert int(key_0, 16) and int(key_1, 16)  # throws ValueError if not a hex string
+
+        # TODO: Look for more secure way of loading keys
+        # using command line args which then go on to create immutable hex strings seems less than ideal
+
+        # Set a flag to load the keys as soon as the next card arrives
+        self.key_0_byte_list = toBytes(key_0)
+        self.key_1_byte_list = toBytes(key_1)
+        self.key_load_pending = True
+
+    def _load_keys(self, connection):
+        """Load keys into the reader"""
+        assert len(self.key_0_byte_list) == 6 and len(self.key_1_byte_list) == 6
+        Reader._transmit(connection, PICC_CMD_LOAD_KEY_0, self.key_0_byte_list)
+        Reader._transmit(connection, PICC_CMD_LOAD_KEY_1, self.key_1_byte_list)
+
+        for i in range(0, 6):  # Wipe the stored key
+            self.key_0_byte_list[i] = 0xFF
+            self.key_1_byte_list[i] = 0xFF
+        self.key_load_pending = False
 
     @staticmethod
     def get_serial_number(connection):
@@ -134,7 +163,7 @@ class Reader(ReaderBase):
 
     @staticmethod
     def _transmit(connection, command, command_vars=None):
-        """Returns: data"""
+        """Returns: data as a byte list"""
         if command_vars is None: command_vars = []
         command_desc = command[0]
         full_command = command[1] + command_vars
@@ -150,7 +179,7 @@ class Reader(ReaderBase):
         elif response_code == "6A 81":
             raise exceptions.NotSupportedException(command_desc)
         elif response_code != "90 00":
-            raise exceptions.UnexpectedErrorCodeException(response_code, command_desc)
+            raise exceptions.UnexpectedErrorCodeException(response_code, command_desc, sw[0], sw[1])
         return data
 
     @staticmethod
