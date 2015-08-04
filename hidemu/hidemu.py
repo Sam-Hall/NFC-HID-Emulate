@@ -20,10 +20,16 @@ try:  # Non-standard module imports that may fail
     from output import keystroker
     from smartcard.util import toHexString, toBytes, PACK, HEX, UPPERCASE, COMMA
     from smartcard.Exceptions import CardRequestTimeoutException, CardConnectionException
-    from reader.exceptions import ReaderNotFoundException, FailedException, ConnectionLostException
+    from reader.exceptions import ReaderNotFoundException, FailedException, ConnectionLostException, PyScardFailure
 except BaseException:
     logger.critical(traceback.format_exc())
     raise
+
+
+class GracefulExit(Exception):
+    """Card connection no longer valid"""
+    def __init__(self, *args):
+        Exception.__init__(self, "Process terminated", *args)
 
 
 class HIDEmu:
@@ -230,6 +236,11 @@ class HIDEmu:
                 conn = None
         except KeyboardInterrupt:
             self.logger.warn('Terminated by user')
+        except GracefulExit:
+            self.logger.warn('Process terminated')
+        except PyScardFailure:
+            self.logger.critical('PCSC service failure, check dependencies including version numbers.')
+            raise
         except BaseException:
             self.logger.critical(traceback.format_exc())
             raise

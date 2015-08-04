@@ -19,6 +19,7 @@ Requires:
 
 * pyscard 1.7
 * No drivers required
+* Smart Card service required (should start as soon as the reader installs via Plug and Play)
 
 ### Linux
 Tested on Ubuntu 14.04 and 14.10

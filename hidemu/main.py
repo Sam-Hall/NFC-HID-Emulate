@@ -6,16 +6,16 @@
 #
 
 
-import os
 import logging
 import json
 import argparse
+import signal
 
-from hidemu import HIDEmu
+from hidemu import HIDEmu, GracefulExit
 
 # These values are also used setup.py
 __app_name__ = "ACR122 HID Emulator"
-__version__ = "0.3.00"  # TODO: Update this before build
+__version__ = "0.3.01"  # TODO: Update this before build
 
 
 def setup_logger(logger_name, log_filename):
@@ -81,8 +81,8 @@ def setup_arg_parser():
                         "  * {UIDINT} card UID as little endian base 10 value\n"
                         "  * {UID} card UID as raw hex byte string\n"
                         "  * {CR} line separator (OS specific)\n"
-                        # "  * {DATA} equates to {DATA0}\n"
-                        # "  * {DATA<n>} data defined by DATADEFINITION element n\n"
+                        "  * {DATA} equates to {DATA0}\n"
+                        "  * {DATA<n>} data defined by DATADEFINITION element n\n"
                         "  * Use \"{{\" to output \"{\" and \"}}\" to output \"}\"\n",
                         default="{UIDLEN}{TYPE}^{UIDINT}")
     # parser.add_argument("-t2", "--track2", type=substitution_string_arg,
@@ -102,10 +102,10 @@ def setup_arg_parser():
                         help="String to output after pseduo-tracks (optional). \n\nDEFAULT: {CR}",
                         default="{CR}")
     parser.add_argument("-k0", "--key0", type=mifare_key_arg,
-                        help="Mifare Key 1 - six bytes. \n\nDEFAULT: FFFFFFFFFFFF",
+                        help="Mifare Key 0 - six bytes. \n\nDEFAULT: FFFFFFFFFFFF",
                         default="FFFFFFFFFFFF")
     parser.add_argument("-k1", "--key1", type=mifare_key_arg,
-                        help="Mifare Key 2 - six bytes. \n\nDEFAULT: FFFFFFFFFFFF",
+                        help="Mifare Key 1 - six bytes. \n\nDEFAULT: FFFFFFFFFFFF",
                         default="FFFFFFFFFFFF")
     # parser.add_argument("-kf", "--keyfile",
     #                     help="Mifare Key file - two lines (KEY1 and KEY2).\n"
@@ -138,27 +138,19 @@ def mifare_key_arg(value):
 
 def log_file_arg(file_name):
     """Validate log file is writable"""
-    try:  # Test write a single newline character to the file
-        with open(file_name, "ab+") as file_handle:
-            file_handle.write("\x0D")
+    try:  # Test write app name and version to the file
+        with open(file_name, "a") as file_handle:
+            file_handle.write("{0} {1}\n".format(__app_name__, __version__))
             file_handle.close()
     except IOError:
         raise ValueError
-
-    try:  # Attempt to clean up the character
-        with open(file_name, "rb+") as file_handle:
-            file_handle.seek(-1, os.SEEK_END)
-            file_handle.truncate()
-            file_handle.close()
-    except IOError:
-        pass  # Cleanup isn't a requirement for logging and fails on /dev/null for instance
 
     return file_name
 
 
 def substitution_string_arg(string):
     try:
-        # Keeo this list in sync with the format list in HIDEmu._process_output_string
+        # Keep this list in sync with the format list in HIDEmu._process_output_string
         string.format(UIDLEN="", TYPE="", SUBTYPE="", UIDINT="", UID="", CR="", DATA="",
                       DATA0="", DATA1="", DATA2="", DATA3="", DATA4="", DATA5="", DATA6="", DATA7="")
     except KeyError:
@@ -166,8 +158,13 @@ def substitution_string_arg(string):
     return string
 
 
+def signal_handler(signal, frame):
+    raise GracefulExit()
+
+
 def main():
     """Validate args, initialise logger and start up HIDEmu"""
+    global hid_emu
     parser = setup_arg_parser()
     # For testing json parser...
     # -dd '[{"auth":"A0","type":"int","mad":"HHHH","block":12,"offset":1,"length":4}]'
@@ -188,4 +185,6 @@ def main():
 
 
 if __name__ == '__main__':
+    # TODO: No luck getting this to work on Windows as yet
+    signal.signal(signal.SIGTERM, signal_handler)
     main()

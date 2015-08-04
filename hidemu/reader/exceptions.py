@@ -6,6 +6,12 @@
 #
 
 
+class PyScardFailure(Exception):
+    """Unexpected failure from the bowels of PyScard"""
+    def __init__(self, *args):
+        Exception.__init__(self, "PyScard failed to interact with PCSC service", *args)
+
+
 class ReaderNotFoundException(Exception):
     """Reader not attached or no longer available"""
     def __init__(self, *args):
