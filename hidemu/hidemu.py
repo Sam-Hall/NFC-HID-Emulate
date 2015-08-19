@@ -98,8 +98,8 @@ class HIDEmu:
                     data = HIDEmu.bytes_to_type(block_read, data_type)
                     data_list[i] = data
                 except FailedException:
-                    self.logger.warn("Data definition failed to apply to current card: " + str(data_spec))
-                    raise
+                    self.logger.info("Data definition failed to apply to current card: " + str(data_spec))
+                    data_list[i] = ""
                 except ConnectionLostException:
                     self.logger.warn("Connection lost while processing data definition.")
                     raise

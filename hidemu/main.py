@@ -15,7 +15,7 @@ from hidemu import HIDEmu, GracefulExit
 
 # These values are also used setup.py
 __app_name__ = "ACR122 HID Emulator"
-__version__ = "0.3.01"  # TODO: Update this before build
+__version__ = "0.3.03"  # TODO: Update this before build
 
 
 def setup_logger(logger_name, log_filename):
