@@ -98,7 +98,7 @@ class HIDEmu:
                     data = HIDEmu.bytes_to_type(block_read, data_type)
                     data_list[i] = data
                 except FailedException:
-                    self.logger.info("Data definition failed to apply to current card: " + str(data_spec))
+                    self.logger.info("Data definition #" + str(i) + " failed to apply to current card")
                     data_list[i] = ""
                 except ConnectionLostException:
                     self.logger.warn("Connection lost while processing data definition.")
@@ -150,6 +150,12 @@ class HIDEmu:
     def _read_block(self, connection, block, length, key_a_num=None, key_b_num=None):
         ret_list = self.reader.read_block(connection, block, length, key_a_num, key_b_num)
         return ret_list
+
+    @staticmethod
+    def _reader_exists(reader_prefix):
+        #TODO: This is too clunky, find a smoother way to check this and review the whole "from reader import autodetect" thing
+        from reader import autodetect
+        return autodetect.reader_exists(reader_prefix)
 
     @staticmethod
     def _little_endian_value(byte_list):
@@ -217,6 +223,8 @@ class HIDEmu:
 
             while self.running:
                 try:
+                    if not self._reader_exists("ACS ACR122"):
+                        raise ReaderNotFoundException
                     if conn is None: conn = self.reader.connect()
                     if conn is not None:
                         self._process_card(conn)
@@ -234,6 +242,8 @@ class HIDEmu:
                     self.logger.error(traceback.format_exc())
                     self.reader.error_signal(duration=6)
                 conn = None
+        except ReaderNotFoundException:
+            self.logger.critical('Reader disconnected')
         except KeyboardInterrupt:
             self.logger.warn('Terminated by user')
         except GracefulExit:
