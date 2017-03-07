@@ -1,16 +1,15 @@
 #!/usr/bin/env python
-# Copyright (c) 2015 Sam Hall, Charles Darwin University
+# Copyright (c) 2017 Sam Hall, Charles Darwin University
 # See LICENSE.txt for details.
 #
-# acr122.py - Controls the ACR122 reader
+# omnikey5x21cl.py - Controls the Omnikey 5x21 CL reader
 
-"""ACR122 reader module
+"""Omnikey 5x21 CL reader module
 
-All ACR122 specific code goes here.
+All Omnikey 5x21 CL specific code goes here.
 
 """
 
-import time
 import logging
 import exceptions
 from base import ReaderBase
@@ -18,28 +17,25 @@ from smartcard.CardRequest import CardRequest
 from smartcard.Exceptions import CardConnectionException, NoCardException
 from smartcard.util import toHexString, toBytes
 
-# ACR122 API Documented Commands including a short description for error handling
+# Omnikey Documented Commands including a short description for error handling
 # Typical command format: [class, ins, p1, p2, lc] + data byte list
 PICC_CMD_GET_DATA   = ["Fetch UID",   [0xFF, 0xCA, 0x00, 0x00, 0x00]]
-PICC_CMD_LOAD_KEY_0 = ["Load Key 0",  [0xFF, 0x82, 0x00, 0x00, 0x06]]  # + key byte list
-PICC_CMD_LOAD_KEY_1 = ["Load Key 1",  [0xFF, 0x82, 0x00, 0x01, 0x06]]  # + key byte list
+PICC_CMD_LOAD_KEY_0 = ["Load Key 0",  [0xFF, 0x82, 0x20, 0x00, 0x06]]  # + key byte list
+PICC_CMD_LOAD_KEY_1 = ["Load Key 1",  [0xFF, 0x82, 0x20, 0x01, 0x06]]  # + key byte list
 PICC_CMD_MFC_AUTH   = ["Sector Auth", [0xFF, 0x86, 0x00, 0x00, 0x05, 0x01, 0x00]]  # + [block num, key type A/B, key num]
 PICC_CMD_READ_BLOCK = ["Read Block",  [0xFF, 0xB0, 0x00]]  # + [block num, length]
-PICC_CMD_OUTPUT_CTL = ["Output Ctl.", [0xFF, 0x00, 0x40]]  # + [LED state, lc, T1 dur., T2 dur., repetitions, buzzer]
 
-# Example Pseudo-APDU read command (may need similar such commands for Mifare Plus)
-PICC_CMD_READ_BLOCK0_DIRECT = ["Read Block Direct", [0xFF, 0x00, 0x00, 0x00, 0x05, 0xD4, 0x40, 0x01, 0x30, 0x00]]
 
 
 class Reader(ReaderBase):
-    """ACR122 reader class
+    """Omnikey 5x21 CL reader class
 
-    Built for ACR122U but may support similar USB models. This class will only ever support basic reading operations.
+    Support for basic reading operations.
     """
 
     def __init__(self):
         ReaderBase.__init__(self)
-        self.prefix = "ACS ACR122"
+        self.prefix = "OMNIKEY CardMan 5x21-CL"
         self.reader = Reader._find_reader(self.prefix)
         self.logger = logging.getLogger('hidemu')
 
@@ -81,39 +77,6 @@ class Reader(ReaderBase):
                 self.card_authentication = [sector, key_a_num, key_b_num]
         return Reader._read_block(connection, block, length)
 
-    def error_signal(self, duration=6):
-        """If possible, blink or bleep at the user (duration in seconds)
-
-        Intended to alert the user that there's a problem, details of the issue will be logged"""
-        try:
-            connection = self.reader.createConnection()
-            connection.connect()
-            Reader._output_control(connection, 0x50, 0x05, 0x05, duration, 0x00)
-            time.sleep(duration)
-        except Exception as e:
-            self.logger.error('Exception while attempting to send error signals to reader: ' + type(e).__name__)
-            pass
-
-    @staticmethod
-    def busy_signal(connection):
-        """Orange light"""
-        Reader._output_control(connection, 0x0F)  # 0x0F enables both red and green LED (makes orange)
-
-    @staticmethod
-    def ready_signal(connection):
-        """Green light"""
-        Reader._output_control(connection, 0x0E)  # 0x0E enables just green LED
-
-    @staticmethod
-    def _output_control(connection, led_state, t1_dur=0x00, t2_dur=0x00, repetitions=0x00, buzzer=0x00):
-        try:
-            Reader._transmit(connection, PICC_CMD_OUTPUT_CTL, [led_state, 0x04, t1_dur, t2_dur, repetitions, buzzer])
-        except exceptions.UnexpectedErrorCodeException, args:
-            # Current LED State returned via sw2 which _transmit does not expect
-            sw1 = args[3]
-            if sw1 == 0x90: pass
-            else: raise
-
     def set_keys(self, key_0=None, key_1=None):
         """Specify reader keys 0 and 1 as 12 character hex strings (not to be confused with sector keys A and B)
 
@@ -124,9 +87,6 @@ class Reader(ReaderBase):
         if key_1 is None: key_1 = "FFFFFFFFFFFF"
         assert len(key_0) == 12 and len(key_1) == 12
         assert int(key_0, 16) and int(key_1, 16)  # throws ValueError if not a hex string
-
-        # TODO: Look for more secure way of loading keys
-        # using command line args which then go on to create immutable hex strings seems less than ideal
 
         # Set a flag to load the keys as soon as the next card arrives
         self.key_0_byte_list = toBytes(key_0)
@@ -176,7 +136,6 @@ class Reader(ReaderBase):
         assert 0x00 <= length <= 0xff
 
         data = Reader._transmit(connection, PICC_CMD_READ_BLOCK, [block, length])
-        # data = Reader._transmit(connection, PICC_CMD_READ_BLOCK0_DIRECT)
         return data
 
     @staticmethod

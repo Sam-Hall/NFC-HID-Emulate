@@ -14,8 +14,8 @@ import signal
 from hidemu import HIDEmu, GracefulExit
 
 # These values are also used setup.py
-__app_name__ = "ACR122 HID Emulator"
-__version__ = "0.4.00"  # TODO: Update this before build
+__app_name__ = "NFC HID Emulator"
+__version__ = "0.5.01"  # TODO: Update this before build
 
 
 def setup_logger(logger_name, log_filename):
@@ -25,7 +25,7 @@ def setup_logger(logger_name, log_filename):
     # Levels: NOTSET, DEBUG, INFO, WARNING, ERROR, CRITICAL
     logfile_level = logging.INFO
     console_level = logging.NOTSET
-    #console_level = logging.DEBUG  # TODO: Comment this out before build
+    console_level = logging.DEBUG  # TODO: Comment this out before build
 
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.DEBUG)

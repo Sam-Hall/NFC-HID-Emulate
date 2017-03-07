@@ -20,13 +20,10 @@ from smartcard.pcsc import PCSCExceptions
 
 
 def reader_exists(reader_prefix):
-    """Returns boolean based on the existence of our reader
-
-    The just happens to be the first place the app falls over if pcsc isn't available,
-    beware the anecdotal attempt at cross platform exception handling."""
+    """Returns boolean based on the existence of our reader."""
     try:
         for r in readers():
-            if reader_prefix in str(r) and str(r).index(reader_prefix) == 0:
+            if r.name.startswith(reader_prefix):
                 return True
         return False
     except TypeError:  # Occurs when SCardSvr is not running on Windows
@@ -39,7 +36,11 @@ def reader_exists(reader_prefix):
 # SUPPORT FOR ADDITIONAL READERS MAY BE ADDED IN VIA THIS BLOCK HERE!
 if reader_exists("ACS ACR122"):
     import acr122 as reader
-# elif usb_device_exists("MY READER"):
+elif reader_exists("OMNIKEY CardMan 5x21-CL"):
+    import omnikey5x21cl as reader
+elif reader_exists("SCM Microsystems Inc. SDI011"):
+    import sdi011 as reader
+# elif reader_exists("MY READER"):
 #     import my_reader as reader
 else:
     raise exceptions.ReaderNotFoundException

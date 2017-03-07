@@ -152,12 +152,6 @@ class HIDEmu:
         return ret_list
 
     @staticmethod
-    def _reader_exists(reader_prefix):
-        #TODO: This is too clunky, find a smoother way to check this and review the whole "from reader import autodetect" thing
-        from reader import autodetect
-        return autodetect.reader_exists(reader_prefix)
-
-    @staticmethod
     def _little_endian_value(byte_list):
         little_endian_value = 0
         for i in range(0, len(byte_list)):
@@ -223,7 +217,7 @@ class HIDEmu:
 
             while self.running:
                 try:
-                    if not self._reader_exists("ACS ACR122"):
+                    if not self.reader.exists():
                         raise ReaderNotFoundException
                     if conn is None: conn = self.reader.connect()
                     if conn is not None:
