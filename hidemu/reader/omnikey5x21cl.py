@@ -122,9 +122,23 @@ class Reader(ReaderBase):
             # Connection lost
             raise exceptions.ConnectionLostException
         response_code = toHexString(sw)
-        if response_code == "63 00":
+        if response_code == "64 00":  # card execution error
             raise exceptions.FailedException(command_desc)
-        elif response_code == "6A 81":
+        elif response_code == "67 00":  # wrong length
+            raise exceptions.NotSupportedException(command_desc)
+        elif response_code == "68 00":  # invalid class (CLA) byte
+            raise exceptions.NotSupportedException(command_desc)
+        elif response_code == "69 81":  # Command incompatible.
+            raise exceptions.FailedException(command_desc)
+        elif response_code == "69 82":  # Security status not satisfied.
+            raise exceptions.FailedException(command_desc)
+        elif response_code == "69 86":  # Command not allowed.
+            raise exceptions.FailedException(command_desc)
+        elif response_code == "6A 81":  # invalid instruction (INS) byte
+            raise exceptions.NotSupportedException(command_desc)
+        elif response_code == "6A 82":  # File not found / Addressed block or byte does not exist.
+            raise exceptions.FailedException(command_desc)
+        elif response_code.startswith("6C"):  # wrong length
             raise exceptions.NotSupportedException(command_desc)
         elif response_code != "90 00":
             raise exceptions.UnexpectedErrorCodeException(response_code, command_desc, sw[0], sw[1])

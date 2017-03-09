@@ -1,0 +1,2 @@
+hidemu
+pyscard>=1.7.0
